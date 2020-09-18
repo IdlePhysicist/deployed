@@ -7,28 +7,34 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
-var daysF, weeksF bool
+var (
+	daysF, weeksF, versionF bool
+	version string
+)
 
 func init() {
-	flag.BoolVar(&daysF, "days", false, "Unit: days (24 h)")
-	flag.BoolVar(&weeksF, "weeks", false, "Unit: weeks (168 h)")
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage of deployed: [VALUE] [UNIT days weeks]\n")
+		flag.PrintDefaults()
+	}
+	flag.BoolVar(&versionF, "v", false, "Display version information")
 }
 
 func main() {
 	flag.Parse()
 
-	if (! daysF && ! weeksF) || ( daysF && weeksF) {
-		fmt.Println("Please specify a single unit arg")
-		flag.Usage()
-		os.Exit(1)
+	if versionF {
+		fmt.Println(version)
+		os.Exit(0)
 	}
 
 	if flag.NArg() == 0 {
 		scanner := bufio.NewScanner(os.Stdin)
-		scanner.Split(bufio.ScanWords)
+		scanner.Split(bufio.ScanLines)
 
 		for scanner.Scan() {
 			if err := calculate(scanner.Text()); err != nil {
@@ -36,17 +42,15 @@ func main() {
 			}
 		}
 	} else {
-		for _, input := range flag.Args() {
-			if err := calculate(input); err != nil {
-				log.Fatal(err)
-			}
+		if err := calculate(flag.Arg(0) + " " + flag.Arg(1)); err != nil {
+			log.Fatal(err)
 		}
 	}
 
 }
 
 func calculate(inputStr string) (err error) {
-	input, err := strconv.ParseFloat(inputStr, 64)
+	input, err := parseInput(inputStr)
 	if err != nil {
 		return
 	}
@@ -68,4 +72,25 @@ func calculate(inputStr string) (err error) {
 	fmt.Println(time.Now().Add(answer * -1).UTC().Format("2006-01-02 T15:04 -0700"))
 
 	return nil
+}
+
+func parseInput(input string) (value float64, err error) {
+	comp := strings.Split(input, " ")
+	if len(comp) == 0 {
+		return 0.0, fmt.Errorf("no input\n")
+	}
+
+	value, err = strconv.ParseFloat(comp[0], 64)
+	if err != nil {
+		return
+	}
+
+	switch comp[1] {
+	case "day", "days":
+		daysF = true
+	case "week", "weeks":
+		weeksF = true
+	}
+
+	return
 }
